@@ -10,6 +10,7 @@
  * @author   Kevin Fodness <kevin@kevinfodness.com>, Beau Watson <bwatson@fingerpaintmarketing.com>
  * @license  GPLv3
  * @link     http://www.kevinfodness.com
+ * @version  1.0.1
  */
 
 /**
@@ -132,11 +133,33 @@ HTML;
             break;
         case 'checkbox':
             $field = '';
-            $checked = (!empty($data['value'])) ? 'checked="checked"' : '';
-            $data['title'] = <<<HTML
+            //if we have an array ofcheckboxes, loop through them
+            if (!empty($this->fields[$key]['values']) 
+                && is_array($this->fields[$key]['values'])
+            ) {
+                //base64 decode the data, then unserialize it
+                $values = unserialize(base64_decode($data['value']));
+                $data["title"] .= '</label>';
+                //looping through the checkboxes
+                foreach ($this->fields[$key]['values'] as $value => $name) {
+                    // if the current instance's value is in the values array, set it as checked
+                    $checked = (!empty($values) && in_array($value,$values)) ? 'checked="checked"' : '';
+
+                    //prep the HTML. We're cheating and closing the label early to keep the entire checkbox group from getting encloded
+                    //  in the label. Then, wrap a label around the checkbox.
+                    $data['title'] .= <<<HTML
+<br><label><input id="{$data['field_id']}" value="{$value}" name="{$data['field_name']}[]" type="checkbox" {$checked} /> {$name}</label>
+HTML;
+                }
+            } else {
+                //if it's not an array, simply write it out
+                $checked = (!empty($data['value'])) ? 'checked="checked"' : '';
+                $data['title'] = <<<HTML
 <input id="{$data['field_id']}" name="{$data['field_name']}" type="checkbox" {$checked} />
 HTML
                 . substr($data['title'], 0, -1);
+            }
+
             break;
         case 'file':
             $field = <<<HTML
@@ -221,12 +244,19 @@ HTML;
      */
     public function update($new_instance, $old_instance)
     {
-        $instance = array();
         foreach ($this->fields as $key => $field) {
-            if (!empty($new_instance[$key])) {
+            if (!empty($new_instance[$key]) && !is_array($new_instance[$key])) {
                 $instance[$key] = strip_tags($new_instance[$key]);
+            } else {
+                $values = array();
+                foreach ($new_instance[$key] as $value) {
+                    $values[] = strip_tags($value);
+                }
+                // base64_encode (to prevent glitches) and serialize the values
+                $instance[$key] = base64_encode(serialize($values));
             }
         }
+
         return $instance;
     }
 }
